@@ -2,16 +2,27 @@ const fetch = require("node-fetch");
 
 const endpoint =
   "https://api-bff.nftpricefloor.com/nft/forgotten-runes-wizards-cult/chart/pricefloor?interval=all";
-const duration = 3 * 30; // 8 hour periods
+
+const historicalDuration = 90; // days
+const futureDuration = 30; // days
 
 const main = async () => {
   const { dataPriceFloorETH } = await fetch(endpoint).then((r) => r.json());
-  const floorStdev = stdev(dataPriceFloorETH.slice(-3 * 30));
-  const vol = floorStdev * Math.sqrt(duration);
 
-  console.log("running", dataPriceFloorETH.slice(-30));
-  console.log("vol", vol);
-  console.log("len", dataPriceFloorETH.slice(-3 * 30).length);
+  // convert 8 hours into days
+  const dailyPrices = dataPriceFloorETH.filter((_, i) => i % 3 === 0);
+  const prices = dailyPrices.slice(-historicalDuration);
+  const logPrices = prices.map((v) => Math.log(v));
+  const percentageChanges = logPrices.map((v, i) =>
+    i > 0 ? (v - logPrices[i - 1]) / logPrices[i - 1] : 0
+  );
+  const floorStdev = stdev(percentageChanges);
+  const vol = floorStdev * Math.sqrt(futureDuration);
+
+  console.log(logPrices);
+  console.log(percentageChanges);
+  console.log("daily prices: ", dataPriceFloorETH.slice(-30));
+  console.log("vol: ", vol);
 };
 
 const stdev = (periods) => {
@@ -28,18 +39,5 @@ const stdev = (periods) => {
 
   return _stdev;
 };
-
-function volatility(values) {
-  const n = values.length;
-
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-
-  const deviation = values.reduce(
-    (dev, val) => dev + (val - mean) * (val - mean),
-    0
-  );
-
-  return Math.sqrt(deviation / n);
-}
 
 main();
